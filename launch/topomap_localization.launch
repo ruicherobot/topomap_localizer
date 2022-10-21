@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<launch>
+
+  <!-- <include file="$(find feature_extraction)/launch/osm.launch" ns="feature_extraction">
+  </include> -->
+
+  <node name="maplite" pkg="topomap_localizer" type="maplite_node" ns="maplite" output="screen">
+    
+    <!--  FRB  -->
+    <param name="tx" value="32" />  
+    <param name="ty" value="-33.6" />  
+    <param name="theta" value="-2.25" />
+
+    <param name="particleNum" value="100" />
+    <param name="nearest_node_number" value="50" />
+
+    <param name="noise_coefficient_x" value="0.7" />
+    <param name="noise_coefficient_y" value="0.7" />
+    <param name="noise_coefficient_t" value="0.2" />
+    <param name="noise_stdev" value="1.0" />
+    
+  </node>
+
+</launch>
