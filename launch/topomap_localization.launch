@@ -14,11 +14,22 @@
     <param name="particleNum" value="100" />
     <param name="nearest_node_number" value="50" />
 
-    <param name="noise_coefficient_x" value="0.7" />
-    <param name="noise_coefficient_y" value="0.7" />
-    <param name="noise_coefficient_t" value="0.2" />
-    <param name="noise_stdev" value="1.0" />
+    <param name="noise_coefficient_action_x" value="0.7" />
+    <param name="noise_coefficient_action_y" value="0.7" />
+    <param name="noise_coefficient_action_t" value="0.2" />
+    <param name="noise_stdev_action" value="1.0" />
     
+    <param name="noise_coefficient_init_x" value="1.0" />
+    <param name="noise_coefficient_init_y" value="1.0" />
+    <param name="noise_coefficient_init_t" value="0.1" />
+    <param name="noise_stdev_init" value="4.0" />
+
+    <param name="center_rec_x" value="8.0" />
+    <param name="center_rec_y" value="-28.0" />
+
+    <param name="threshold_odom_init" value="20" />
+    
+
   </node>
 
 </launch>

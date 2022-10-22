@@ -112,6 +112,8 @@ namespace maplite {
 
         int nearest_node_number_;
 
+        int threshold_odom_init_;
+
         std::vector<particle_t> particles_;
 
         geometry_msgs::Point odom_pf_pre_;
@@ -124,19 +126,31 @@ namespace maplite {
 
         geometry_msgs::Point pos_temp_;
 
+        double center_rec_x_;
+
+        double center_rec_y_;
+
         double estimated_x_;
 
         double estimated_y_;
 
         double estimated_t_;
 
-        double noise_coefficient_x_;
+        double noise_coefficient_action_x_;
 
-        double noise_coefficient_y_;
+        double noise_coefficient_action_y_;
 
-        double noise_coefficient_t_;
+        double noise_coefficient_action_t_;
 
-        double noise_stdev_;
+        double noise_stdev_action_;
+
+        double noise_coefficient_init_x_;
+
+        double noise_coefficient_init_y_;
+
+        double noise_coefficient_init_t_;
+
+        double noise_stdev_init_;
 
         double ddistance_;
 

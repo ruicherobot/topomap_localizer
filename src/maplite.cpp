@@ -58,13 +58,25 @@ namespace maplite{
         n.getParam("maplite/tx", tx_);
 	    n.getParam("maplite/ty", ty_);
 	    n.getParam("maplite/theta", theta_);
+        
         n.getParam("maplite/particleNum", particleNum_);
+        
         n.getParam("maplite/nearest_node_number", nearest_node_number_);
-        n.getParam("maplite/noise_coefficient_x", noise_coefficient_x_);
-        n.getParam("maplite/noise_coefficient_y", noise_coefficient_y_);
-        n.getParam("maplite/noise_coefficient_t", noise_coefficient_t_);
-        n.getParam("maplite/noise_stdev", noise_stdev_);
+        
+        n.getParam("maplite/noise_coefficient_action_x", noise_coefficient_action_x_);
+        n.getParam("maplite/noise_coefficient_action_y", noise_coefficient_action_y_);
+        n.getParam("maplite/noise_coefficient_action_t", noise_coefficient_action_t_);
+        n.getParam("maplite/noise_stdev_action", noise_stdev_action_);
+        
+        n.getParam("maplite/noise_coefficient_init_x", noise_coefficient_init_x_);
+        n.getParam("maplite/noise_coefficient_init_y", noise_coefficient_init_y_);
+        n.getParam("maplite/noise_coefficient_init_t", noise_coefficient_init_t_);
+        n.getParam("maplite/noise_stdev_init", noise_stdev_init_);
 
+        n.getParam("maplite/center_rec_x", center_rec_x_);
+	    n.getParam("maplite/center_rec_y", center_rec_y_);
+        
+        n.getParam("maplite/threshold_odom_init", threshold_odom_init_);
         // initialize updateOdom
         odom_temp_pre_.x = 0;
         odom_temp_pre_.y = 0;
@@ -106,8 +118,8 @@ namespace maplite{
             point_cloud_.push_back(temp);
         }
         std::vector<double> bias;
-        bias.push_back(8.0);
-        bias.push_back(-28.0);
+        bias.push_back(center_rec_x_);
+        bias.push_back(center_rec_y_);
         landmarks_.Create(bias, point_cloud_);
         std::cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<std::endl;
         std::cout<<points.points.size()<<"   points<<<<<<<<<<----size---->>>>>>>>landmarks  "<<landmarks_.size_<<std::endl;
@@ -130,7 +142,7 @@ namespace maplite{
         tf::Matrix3x3(quaternion_tf).getRPY(roll_, pitch_, yaw_);
         
         // compensate the bias in original odom orientation
-        if(odomcount_ == 20){
+        if(odomcount_ == threshold_odom_init_){
             theta_ = theta_ - yaw_;
             estimated_t_ = theta_;
             std::cout<<"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"<<std::endl;
@@ -204,16 +216,23 @@ namespace maplite{
 
     void MapliteClass::initializeParticles()
     {
+        /**
+        * initializeParticles sets up the motion model for the current update for the localization.
+        * After initialization, calls to applyAction() will be made, so all distributions based on sensor data
+        * should be created here.
+        *
+        * \return   The pose transform distribution representing the uncertainty of the robot's motion.
+        */
         std::random_device rd;
         std::mt19937 generator(rd());
         std::uniform_real_distribution<> dist_uniform(0.0, 1.0 / particleNum_);
-        std::normal_distribution<> dist_normal(0.0, 4.0);
+        std::normal_distribution<> dist_normal(0.0, noise_stdev_init_);
         
         for(int i = 0; i < particleNum_; i++){
             particle_t p;
-            p.x = tx_ + dist_normal(generator);
-            p.y = ty_ + dist_normal(generator);
-            p.theta = theta_ + 0.1 * dist_normal(generator);
+            p.x = tx_ + noise_coefficient_init_x_ * dist_normal(generator);
+            p.y = ty_ + noise_coefficient_init_y_ * dist_normal(generator);
+            p.theta = theta_ + noise_coefficient_init_t_ * dist_normal(generator);
             p.weight = 1.0 / particleNum_;
             particles_.push_back(p);
         }
@@ -288,17 +307,21 @@ namespace maplite{
 
     // The noise magnitude should be adoped according to the difference of odometry 
     void MapliteClass::applyActionmodel(){
+        /**
+        * applyActionmodel applies the motion from odometry to the provided sample and returns a new sample that
+        * can be part of the proposal distribution for the particle filter.
+        * when cassie doesn't move, there are no noises when propagating the particles.
+        * otherwise if cassie stands still for a long time, the particles will diverge.
+        * under this logic, the greater the delta_odom, the greater the noise.
+        * this makes more sense than simply set maximum thereshold.
+        */
         std::random_device rd;
         std::mt19937 generator(rd());
         std::uniform_real_distribution<> dist_uniform(0.0, 1.0 / particleNum_);
-        std::normal_distribution<> dist_normal(0.0, noise_stdev_);
-        // when cassie doesn't move, there are no noises when propagating the particles.
-        // otherwise if cassie stands still for a long time, the particles will diverge.
-        // under this logic, the greater the delta_odom, the greater the noise.
-        // this makes more sense than simply set maximum thereshold.
-        double noise_magnitude_x = noise_coefficient_x_ * ddistance_;
-        double noise_magnitude_y = noise_coefficient_y_ * ddistance_;
-        double noise_magnitude_t = noise_coefficient_t_ * abs(odom_dt_);
+        std::normal_distribution<> dist_normal(0.0, noise_stdev_action_);
+        double noise_magnitude_x = noise_coefficient_action_x_ * ddistance_;
+        double noise_magnitude_y = noise_coefficient_action_y_ * ddistance_;
+        double noise_magnitude_t = noise_coefficient_action_t_ * abs(odom_dt_);
         for(int i = 0; i < particleNum_; i++){
             particles_[i].x = particles_[i].x + odom_dx_ + noise_magnitude_x * dist_normal(generator);
             particles_[i].y = particles_[i].y + odom_dy_ + noise_magnitude_y * dist_normal(generator);
