@@ -24,11 +24,17 @@
     <param name="noise_coefficient_init_t" value="0.1" />
     <param name="noise_stdev_init" value="4.0" />
 
+    <param name="noise_coefficient_resample_x" value="0.5" />
+    <param name="noise_coefficient_resample_y" value="0.5" />
+    <param name="noise_coefficient_resample_t" value="0.05" />
+    <param name="noise_stdev_resample" value="1.0" />
+
     <param name="center_rec_x" value="8.0" />
     <param name="center_rec_y" value="-28.0" />
 
     <param name="threshold_odom_init" value="20" />
-    
+    <param name="ratio_resample" value="1.0" />
+    <param name="ratio_calpost" value="1.0" />
 
   </node>
 

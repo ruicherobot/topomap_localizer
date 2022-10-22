@@ -73,10 +73,19 @@ namespace maplite{
         n.getParam("maplite/noise_coefficient_init_t", noise_coefficient_init_t_);
         n.getParam("maplite/noise_stdev_init", noise_stdev_init_);
 
+        n.getParam("maplite/noise_coefficient_resample_x", noise_coefficient_resample_x_);
+        n.getParam("maplite/noise_coefficient_resample_y", noise_coefficient_resample_y_);
+        n.getParam("maplite/noise_coefficient_resample_t", noise_coefficient_resample_t_);
+        n.getParam("maplite/noise_stdev_resample", noise_stdev_resample_);
+
         n.getParam("maplite/center_rec_x", center_rec_x_);
 	    n.getParam("maplite/center_rec_y", center_rec_y_);
         
         n.getParam("maplite/threshold_odom_init", threshold_odom_init_);
+        
+        n.getParam("maplite/ratio_resample", ratio_resample_);
+        n.getParam("maplite/ratio_calpost", ratio_calpost_);
+
         // initialize updateOdom
         odom_temp_pre_.x = 0;
         odom_temp_pre_.y = 0;
@@ -103,6 +112,7 @@ namespace maplite{
         particles_pub_ = n.advertise<visualization_msgs::MarkerArray>("particles", 10);
         cloud_pub_ = n.advertise<sensor_msgs::PointCloud>("point_cloud", 10);
         border_pcl_pub_ = n.advertise<sensor_msgs::PointCloud2>("border_pointcloud", 10);
+        
         // Subscriber
         landmark_sub_ = n.subscribe("/IMOMD/global_map_landmark", 1, &MapliteClass::storeLandmarks, this);
         odo_sub_ = n.subscribe("/cassie/inekf_state", 10, &MapliteClass::updateOdometry, this);
@@ -162,6 +172,13 @@ namespace maplite{
 
     void MapliteClass::updateLocalization(const sensor_msgs::PointCloud2 &msg)
     {
+        /**
+        * updateLocalization is the main loop to estimate localization
+        * it runs at about 10 Hz
+        *
+        * \param    msg         const sensor_msgs::PointCloud2
+        * \return   void
+        */
         kdtreeCount_++;
         odom_pf_ = odom_temp_;
         yaw_pf_ = yaw_;
@@ -201,12 +218,20 @@ namespace maplite{
             this->publishLandmarks();
             
             odom_pf_pre_ = odom_pf_;
+
             pre_yaw_pf_ = yaw_pf_;
         }        
     }
     
     bool MapliteClass::determineMovement()
     {
+        /**
+        * determineMovement determines whether the robot move or not
+        * if not, the action model will not attribute noises
+        *
+        * \param    None          None
+        * \return   return true if the robot moves
+        */
         ddistance_ = sqrt(pow((odom_pf_.x - odom_pf_pre_.x), 2) + pow((odom_pf_.y - odom_pf_pre_.y), 2));
         odom_dx_= (odom_pf_.x - odom_pf_pre_.x) * cos(theta_) - (odom_pf_.y - odom_pf_pre_.y) * sin(theta_);
         odom_dy_ = (odom_pf_.x - odom_pf_pre_.x) * sin(theta_) + (odom_pf_.y - odom_pf_pre_.y) * cos(theta_);
@@ -220,7 +245,7 @@ namespace maplite{
         * initializeParticles sets up the motion model for the current update for the localization.
         * After initialization, calls to applyAction() will be made, so all distributions based on sensor data
         * should be created here.
-        *
+        * \param 
         * \return   The pose transform distribution representing the uncertainty of the robot's motion.
         */
         std::random_device rd;
@@ -244,37 +269,13 @@ namespace maplite{
     }
 
     void MapliteClass::resampleParticles(){
-        std::random_device rd;
-        std::mt19937 generator(rd());
-        std::uniform_real_distribution<> dist_uniform(0.0, 1.0 / particleNum_);
-        std::normal_distribution<> dist_normal(0.0, 1.0);
-        // std::sort(particles_.begin(), particles_.end(), compareByWeight);
-        std::vector<particle_t> prior;
-        double r = dist_uniform(generator);
-        double c = particles_[0].weight;
-        int i = 0;
-        double U = r - 1.0 / particleNum_;
-        double ratio = 1.0;
-        // std::sort (particles_.begin(), particles_.end(), compareByWeight);
-        for(int j = 0; j < particleNum_; j++){
-            U = U + 1.0 / particleNum_;
-            while(U > c){
-                i += 1;
-                c += particles_[i].weight;
-            }
-            prior.push_back(particles_[i]);
-        }
-        for(int j = particleNum_ * ratio; j < particleNum_; j++){
-            particle_t newParticle;
-            newParticle.x = estimated_x_ + 0.5 * dist_normal(generator);
-            newParticle.y = estimated_y_ + 0.5 * dist_normal(generator);
-            newParticle.weight = 1.0 / particleNum_;
-            prior.push_back(newParticle);
-        }
-        particles_.clear();
-        for (auto p: prior){
-            particles_.push_back(p);
-        }
+        /**
+        * initializeParticles sets up the motion model for the current update for the localization.
+        * After initialization, calls to applyAction() will be made, so all distributions based on sensor data
+        * should be created here.
+        * \param 
+        * \return   The pose transform distribution representing the uncertainty of the robot's motion.
+        */
         /**
         std::random_device rd;
         std::mt19937 generator(rd());
@@ -303,11 +304,44 @@ namespace maplite{
             prior.push_back(posterior_[current_index]);
         }    
         */
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_real_distribution<> dist_uniform(0.0, 1.0 / particleNum_);
+        std::normal_distribution<> dist_normal(0.0, noise_stdev_resample_);
+        // std::sort(particles_.begin(), particles_.end(), compareByWeight);
+        std::vector<particle_t> prior;
+        double r = dist_uniform(generator);
+        double c = particles_[0].weight;
+        int i = 0;
+        double U = r - 1.0 / particleNum_;
+        // std::sort (particles_.begin(), particles_.end(), compareByWeight);
+        for(int j = 0; j < particleNum_ * ratio_resample_; j++){
+            U = U + 1.0 / particleNum_;
+            while(U > c){
+                i += 1;
+                c += particles_[i].weight;
+            }
+            prior.push_back(particles_[i]);
+        }
+
+        for(int j = particleNum_ * ratio_resample_; j < particleNum_; j++){
+            particle_t newParticle;
+            newParticle.x = estimated_x_ + noise_coefficient_resample_x_ * dist_normal(generator);
+            newParticle.y = estimated_y_ + noise_coefficient_resample_y_ * dist_normal(generator);
+            newParticle.theta = estimated_t_ + noise_coefficient_resample_t_ * dist_normal(generator);
+            newParticle.weight = 1.0 / particleNum_;
+            prior.push_back(newParticle);
+        }
+        particles_.clear();
+        for (auto p: prior){
+            particles_.push_back(p);
+        }
     }
 
     // The noise magnitude should be adoped according to the difference of odometry 
     void MapliteClass::applyActionmodel(){
         /**
+         *
         * applyActionmodel applies the motion from odometry to the provided sample and returns a new sample that
         * can be part of the proposal distribution for the particle filter.
         * when cassie doesn't move, there are no noises when propagating the particles.
@@ -330,6 +364,12 @@ namespace maplite{
     }
 
     void MapliteClass::applySensormodel(const sensor_msgs::PointCloud2 &msg){
+        /**
+        * applySensormodel
+        * should be created here.
+        * \param    msg
+        * \return   void
+        */
         coordinate_t temp;
         temp.val_[0] = estimated_x_;
         temp.val_[1] = estimated_y_;
@@ -376,16 +416,18 @@ namespace maplite{
     }
 
     void MapliteClass::calculatePosterior(){
-        
+        /**
+         *
+        * calculatePosterior just summarize the poses with respective to their weights.
+        */
         double x_mean = 0.0;
         double y_mean = 0.0;
         double cos_mean = 0.0;
         double sin_mean = 0.0;
         double weightSum = 0.0;
         double covarianceSum = 0.0;
-        double ratio = 1.0;
         //std::sort (particles_.begin(), particles_.end(), compareByWeight);
-        for(int idx = 0; idx < ratio * particleNum_; idx++){
+        for(int idx = 0; idx < ratio_calpost_ * particleNum_; idx++){
             
             x_mean += particles_[idx].weight * particles_[idx].x;
             y_mean += particles_[idx].weight * particles_[idx].y;
@@ -395,11 +437,10 @@ namespace maplite{
         }
         
         if(weightSum == 0.0){
-            std::cout<<"!!!!!!!!!! weightSum == 0 !!!!!!!!!!!"<<std::endl;
+            ROS_ERROR("weightSum == 0");
         }
 
         else{
-            std::cout<<"                      weightSum = "<<weightSum<<std::endl;
             estimated_x_ = x_mean / weightSum;
             estimated_y_ = y_mean / weightSum;
             estimated_t_ = std::atan2(sin_mean, cos_mean);
@@ -408,12 +449,6 @@ namespace maplite{
                 particles_[i].weight = particles_[i].weight / weightSum;
             }
         }
-
-        // for(int i = 0; i < particleNum_; i++){
-        //     covarianceSum += (particles_[i].x - x_mean) * (particles_[i].y - y_mean);
-        // }
-        // covarianceSum /= (particleNum_ - 1);
-        // std::cout<<"       covariance = "<<covarianceSum<<std::endl;
     }
     
 

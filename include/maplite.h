@@ -152,6 +152,14 @@ namespace maplite {
 
         double noise_stdev_init_;
 
+        double noise_coefficient_resample_x_;
+
+        double noise_coefficient_resample_y_;
+
+        double noise_coefficient_resample_t_;
+
+        double noise_stdev_resample_;
+
         double ddistance_;
 
         double odom_dx_;
@@ -162,6 +170,10 @@ namespace maplite {
         
         bool moved_;
         
+        double ratio_resample_;
+    
+        double ratio_calpost_;
+
         std::vector<coordinate_t> point_cloud_;
 
         KdTree landmarks_;
